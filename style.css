@@ -86,6 +86,26 @@ body{
 .seebar-chip.crit{color:var(--red);border-color:rgba(255,77,94,.5)}
 .seebar-chip.safe{color:var(--green);border-color:rgba(67,245,168,.4)}
 
+/* ============ REAL CAMERA + YOLO ============ */
+.camera-toggle{cursor:pointer;color:var(--cyan);border-color:rgba(55,226,255,.4);background:rgba(55,226,255,.08)}
+.camera-toggle:hover{border-color:var(--cyan);color:var(--ink)}
+.camera-toggle.on{color:var(--green);border-color:rgba(67,245,168,.6);background:rgba(67,245,168,.1)}
+
+#camera-pip{position:absolute;top:64px;right:14px;z-index:6;width:212px;
+  background:rgba(5,8,12,.78);border:1px solid rgba(55,226,255,.3);border-radius:10px;overflow:hidden;
+  box-shadow:0 12px 36px rgba(0,0,0,.6);backdrop-filter:blur(4px)}
+#camera-pip.hidden{display:none}
+.camera-head{display:flex;align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid var(--line);
+  font-size:8.5px;letter-spacing:.18em;color:var(--cyan)}
+#camera-pip .camera-head span:first-child{flex:1}
+#cv-status{color:var(--amber)}
+.camera-close{background:transparent;border:none;color:var(--dim);font-size:11px;cursor:pointer;padding:0 2px}
+.camera-close:hover{color:var(--red)}
+#camera-canvas canvas{display:block;width:100%}
+/* dim the live room overlay lightly — the light venetian effect */
+#camera-pip::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent 0 6px,rgba(155,123,255,.04) 6px 7px)}
+
 /* ============ CONSOLE ============ */
 #console{width:430px;min-width:430px;height:100vh;background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column}
 .tabbar{display:flex;border-bottom:1px solid var(--line)}

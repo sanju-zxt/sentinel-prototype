@@ -4,6 +4,8 @@
 
 ![Sentinel Screenshot](shot1.png)
 
+> **Why this exists:** We analyzed Envision, Seeing AI, Google Lookout, Be My Eyes, Aira, WeWALK, NaviBelt, ASHIRASE, Soundscape, and 15 more products + the 2024–25 haptic-navigation literature. **No product combines proactive ambient sensing + haptic-first feedback + on-device AI + silence-first salience filtering.** See [`COMPETITIVE_ANALYSIS.md`](COMPETITIVE_ANALYSIS.md) for the full gap matrix.
+
 ## What is this?
 
 Sentinel is a **proactive, haptic co-pilot** for people who are blind or visually impaired. It solves the core problem that existing tools like Microsoft Seeing AI, Google Lookout, and Envision all share: **they only describe what you point at.** Sentinel watches the world *for* you and intervenes only when it matters.
@@ -83,6 +85,8 @@ js/
   pillar_memory.js    Spatial memory
   pillar_social.js    Remote pilot + kinesthetic body language
   pillar_health.js    Heart rate simulation (rPPG)
+  camera.js           getUserMedia stream manager (webcam)
+  detector.js         YOLOv8-nano ONNX inference + NMS (on-device)
 ```
 
 The core of Sentinel is the **perception filter** — not the world simulation, not the haptics. The filter is what makes Sentinel different from every other assistive tech that narrates everything. It watches, scores, and chooses silence.
@@ -91,16 +95,48 @@ The core of Sentinel is the **perception filter** — not the world simulation, 
 
 - **HTML/CSS** — dark theme, HUD overlay, perception chips
 - **Vanilla JS** (ES modules) — zero dependencies
-- **Web Audio API** — spatial panning for directional haptics
+- **Web Audio API** — spatial panning for directional haptics (the in-browser stand-in for the haptic motor)
 - **Web Speech API** — calm, minimal voice alerts
-- **Web Bluetooth** — haptic wearable communication
+- **onnxruntime-web** — real-time YOLOv8-nano object detection in the browser (WASM, on-device)
+- **Web Bluetooth** *(planned)* — haptic wearable communication once a motor peripheral exists
+
+## Real-World Camera + YOLOv8-nano
+
+Sentinel can watch your **actual room** through your webcam and merge the detections into the same salience pipeline as the simulation — proving the perception core works on the real world.
+
+```
+getUserMedia() → video → 640×640 snapshot → YOLOv8-nano (ONNX/WASM)
+                    → NMS → detections → SEN.Perception.runReal() → decide()
+```
+
+- Click the **🎥 CAMERA** button in the top-right HUD
+- Grant camera permission — the PiP shows what YOLO sees, with bounding boxes
+- Person / car / bicycle / traffic light / stop sign / bench / cell phone detections become real entities that `decide()` scores exactly like simulated ones
+- Works offline — all inference is on-device via WebAssembly. No cloud, no upload.
+- No model? The app degrades gracefully to simulation-only with a spoken hint.
+
+### Providing the model
+
+YOLOv8-nano is ~6 MB. Download it once, export to ONNX, and drop it in the project root:
+
+```bash
+# requires Python + ultralytics (https://docs.ultralytics.com)
+pip install ultralytics
+yolo export model=yolov8n.pt format=onnx imgsz=640   # → yolov8n.onnx
+```
+
+Then place the resulting `yolov8n.onnx` next to `index.html`. The detector hot-checks for it and shows a helpful status if it's missing.
+
+> Tip: use a **facingMode:environment** (rear) camera on a phone for best street-like results.
 
 ## Roadmap
 
-- [ ] Real-time object detection via YOLOv8-nano (on-device, webcam)
-- [ ] MediaPipe skeletal tracking for crowd flow analysis
-- [ ] MiDaS depth estimation for distance perception
-- [ ] Hardware integration (LiDAR-equipped phones, haptic wearables)
+- [x] Real-time object detection via YOLOv8-nano (on-device, webcam) — **done in-browser**
+- [x] Competitive analysis — **see `COMPETITIVE_ANALYSIS.md`**
+- [ ] MediaPipe skeletal tracking for crowd flow analysis + kinesthetic body language
+- [ ] MiDaS depth estimation for distance perception (closes the "head-height branch" gap no cane covers)
+- [ ] Beacon-free indoor positioning (visual SLAM) — NavCog requires $10k+ of beacons; we won't
+- [ ] Hardware integration (LiDAR-equipped phones, haptic wearables — NaviBelt proves insurance reimbursement exists)
 - [ ] Native mobile wrapper (Capacitor / React Native)
 - [ ] Real-world sensor fusion (GPS, compass, accelerometer)
 

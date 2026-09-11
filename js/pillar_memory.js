@@ -115,15 +115,49 @@ SEN.Memory = (() => {
 
   function colorAnswer() {
     const u = S().user;
-    const poi = S().entities.find(e => e.obj === carried.obj);
     return `The object nearest you is ${nearestPoi('color')}.`;
   }
+
+  /* find the nearest identifiable object and describe it by what was asked */
   function nearestPoi(k) {
-    return 'a brushed silver alloy';
+    const u = S().user;
+    const near = S().entities
+      .filter(e => ['poi', 'produce', 'menu', 'bench', 'car'].includes(e.type)
+        && Math.abs(e.x - u.x) < 460 && Math.abs(e.y - u.y) < 460)
+      .sort((a, b) =>
+        Math.hypot(a.x - u.x, a.y - u.y) - Math.hypot(b.x - u.x, b.y - u.y));
+    if (!near.length) return 'nothing recognizable close by — everything around you is out of reach.';
+    const e = near[0];
+    if (e.type === 'produce') {
+      return e.subtype === 'cucumber'
+        ? `a cucumber — dark green, rounded ends, on the stall directly ${sideLabel(u, e)}.`
+        : `a zucchini — matte, slightly swollen base, ${sideLabel(u, e)}.`;
+    }
+    if (e.type === 'menu') return `the café menu, ${sideLabel(u, e)} — it has a laminated card feel.`;
+    if (e.type === 'bench') return `a park bench, ${sideLabel(u, e)} — slatted wood, weather-darkened.`;
+    if (e.type === 'car') return `a parked sedan, ${sideLabel(u, e)} — cool painted metal facing away.`;
+    // poi — the carried-object family
+    const byObj = {
+      keys:      'a brushed silver alloy — a small bunch of keys on a metal ring',
+      wallet:    'dark brown leather with worn corners',
+      meds:      'a white prescription bottle with a child-proof cap',
+      phone:     'your phone — smooth glass, silent',
+    };
+    return byObj[e.obj] || e.label || 'an object I identified earlier';
+  }
+
+  function sideLabel(u, e) {
+    const dx = e.x - u.x, dy = e.y - u.y;
+    const d = Math.hypot(dx, dy) || 1;
+    const fwdX = Math.cos(u.heading), fwdY = Math.sin(u.heading);
+    const nd = fwdY * dx - fwdX * dy;
+    const dot = (dx * fwdX + dy * fwdY) / d;
+    if (Math.abs(dot) > 0.707) return dot > 0 ? 'ahead of you' : 'behind you';
+    return nd > 0 ? 'to your left' : 'to your right';
   }
 
   function whoNear() {
-    const soc = window.SEN.social && SEN.social.nearbyKnown();
+    const soc = window.SEN.Social && SEN.Social.nearbyKnown();
     return soc || "No family signatures close by. Strangers are never analyzed — that's a promise.";
   }
 

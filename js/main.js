@@ -14,6 +14,14 @@ SEN.Main = (() => {
   let lastD = 0;   // for double-tap D
   let lastHint = 0;
 
+  // --- real-world camera + YOLOv8 ---
+  let camOn = false;                 // camera stream active?
+  let detectorInitiated = false;     // tried to load ONNX model yet?
+  let lastDetect = 0;                // frame-throttle timestamp
+  const DETECT_INTERVAL = 180;       // ms between YOLO inferences
+  const CAM_INPUT = document.createElement('canvas');  // 640×640 detector input
+  const CAM_DISPLAY = document.createElement('canvas');// PiP overlay draw target
+
   /* ---------- bootstrap ---------- */
   function boot() {
     S().reset();
@@ -26,9 +34,13 @@ SEN.Main = (() => {
     wireInput();
     wireMemoryInput();
     wireSilentModal();
+    wireCamera();
     wireEvents();
 
     introStory();
+
+    // pre-load onnxruntime-web so the first camera click is fast
+    ensureOrt();
 
     requestAnimationFrame(loop);
   }
@@ -43,6 +55,127 @@ SEN.Main = (() => {
   }
 
   function setStory(html) { document.getElementById('story').innerHTML = html; }
+
+  /* ---------- real camera + YOLOv8 ---------- */
+  function ensureOrt() {
+    if (window.ort || detectorInitiated || !document.head) return;
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.min.js';
+    s.onload = () => {
+      if (window.ort) ort.env.wasm.numThreads = navigator.hardwareConcurrency || 2;
+    };
+    s.onerror = () => console.warn('[SEN] onnxruntime-web failed to load');
+    document.head.appendChild(s);
+  }
+
+  function wireCamera() {
+    document.getElementById('camera-toggle').addEventListener('click', toggleCamera);
+    document.getElementById('camera-dismiss').addEventListener('click', () => {
+      toggleCamera(false);
+    });
+  }
+
+  async function toggleCamera(force) {
+    const next = force !== undefined ? !!force : !camOn;
+    const v = document.getElementById('camera-video');
+
+    if (!next) {
+      SEN.Camera.stop();
+      camOn = false;
+      setHudSensor();
+      document.getElementById('camera-toggle').textContent = 'CAMERA';
+      document.getElementById('camera-pip').classList.add('hidden');
+      voice('Camera off. Simulation only.', 'hint', { who: 'REAL-WORLD CAMERA' });
+      return;
+    }
+
+    // load the ONNX model on first use
+    if (!detectorInitiated) {
+      detectorInitiated = true;
+      document.getElementById('cv-status').textContent = 'MODEL LOADING…';
+      const detStatus = await SEN.Detector.init('yolov8n.onnx');
+      if (detStatus !== 'ready') {
+        document.getElementById('cv-status').textContent = detStatus === 'no-model'
+          ? 'NO MODEL · place yolov8n.onnx in project root'
+          : detStatus === 'no-wasm'
+            ? 'NO WASM · onnxruntime-web unavailable'
+            : 'MODEL ERROR';
+        voice('Camera online, but the detection model is missing. Place yolov8n.onnx in the project folder — see the README. Simulation continues without it.', 'hint', { who: 'REAL-WORLD CAMERA' });
+        return;
+      }
+    }
+
+    await SEN.Camera.init(v);   // point Camera at the hidden <video>
+    const started = await SEN.Camera.start();
+    if (!started) {
+      document.getElementById('cv-status').textContent = SEN.Camera.permissionDenied
+        ? 'CAMERA DENIED'
+        : SEN.Camera.noCamera ? 'NO CAMERA' : 'CAMERA ERROR';
+      voice(SEN.Camera.permissionDenied
+        ? 'Camera access was denied. Grant permission and try again — until then, simulation only.'
+        : 'No camera found on this device. Simulation continues.', 'hint', { who: 'REAL-WORLD CAMERA' });
+      return;
+    }
+
+    camOn = true;
+    document.getElementById('camera-toggle').textContent = 'CAMERA·LIVE';
+    document.getElementById('camera-pip').classList.remove('hidden');
+    document.getElementById('cv-status').textContent = 'YOLOV8-NANO ACTIVE';
+    setHudSensor();
+    voice('Camera online. I am watching the real room now — same silence rule applies.', 'hint', { who: 'REAL-WORLD CAMERA' });
+  }
+
+  function setHudSensor() {
+    const b = document.getElementById('plane-state');
+    if (b) b.textContent = camOn ? 'CAMERA+YOLO' : 'CAMERA+ULTRASOUND';
+  }
+
+  // snapshot → detect → merge into perception (runReal adds to `detected`)
+  function realSense(dt) {
+    if (!camOn) return;
+    const img = SEN.Camera.snapshot(CAM_INPUT);
+    if (!img) return;
+    const detections = SEN.Detector.detect(img);
+    if (!detections || !detections.length) return;
+
+    const u = S().user;
+    P().runReal(detections, u, {});
+    drawPip(detections);
+  }
+
+  // render detections onto the PiP canvas (visualize what Sentinel "sees")
+  function drawPip(dets) {
+    const pip = document.getElementById('camera-pip');
+    if (pip.classList.contains('hidden')) return;
+    const c = CAM_DISPLAY;
+    const ctx = c.getContext('2d');
+    const v = document.getElementById('camera-video');
+    if (!v || !v.videoWidth) return;
+    c.width = 300;
+    c.height = (v.videoHeight / v.videoWidth) * 300;
+    ctx.drawImage(v, 0, 0, c.width, c.height);
+    const sx = c.width / v.videoWidth, sy = c.height / v.videoHeight;
+    for (const d of dets) {
+      const [bx, by, bw, bh] = d.bbox;
+      ctx.strokeStyle = d.label === 'person' ? '#43f5a8' : d.label === 'car' ? '#ffc24d' : '#37e2ff';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(bx * sx, by * sy, bw * sx, bh * sy);
+      ctx.fillStyle = ctx.strokeStyle;
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText(
+        `${d.label} ${Math.round(d.confidence * 100)}%`,
+        bx * sx, Math.max(2, by * sy - 4)
+      );
+    }
+    // replace DOM canvas with our drawing
+    const holder = document.getElementById('camera-canvas');
+    if (holder && holder.parentNode) {
+      if (holder.firstChild !== c) {
+        holder.innerHTML = '';
+        holder.appendChild(c);
+      }
+    }
+  }
 
   /* ---------- tabs ---------- */
   function wireTabs() {
@@ -148,6 +281,13 @@ SEN.Main = (() => {
     SEN.Demo.update(dt);
 
     const detected = P().run(S().entities, u, dt, t);
+
+    // real-world YOLO detections merge into the same perception pipeline
+    // (throttled — model runs at most every ~180 ms to keep the loop smooth)
+    if (camOn && detectorInitiated && now - lastDetect > 180) {
+      lastDetect = now;
+      realSense(dt);
+    }
 
     // privacy shield geofence
     const zone = SEN.Health.privacyCheck(u);

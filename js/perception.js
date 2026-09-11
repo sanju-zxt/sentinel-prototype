@@ -74,6 +74,66 @@ SEN.Perception = (() => {
     return detected;
   }
 
+  /* ---- convert real YOLO detections into entity format ----
+   * Maps camera-frame bbox center to a pseudo world position relative to
+   * the user (calibrated by a nominal field of view). Camera x-offset maps
+   * to the user's left/right; bbox height maps to distance (smaller = farther).
+   */
+  function runReal(detections, u, opts = {}) {
+    const FOV = opts.fov || 62;            // horizontal field of view (deg)
+    const FOCAL = (640 / 2) / Math.tan((FOV * Math.PI) / 360);
+    const M_PX = opts.mPerPixel || 26;     // simulated world px per real meter
+    const out = [];
+    const map = (window.SEN.Detector && window.SEN.Detector.CLASS_MAP) || {};
+
+    for (const d of detections) {
+      const [bx, by, bw, bh] = d.bbox;
+      const cx = bx + bw / 2;
+      const cy = by + bh / 2;
+
+      // distance from apparent size: assume a nominal object "true size"
+      // per class so bigger boxes are closer. Convert meters → world px.
+      const trueSize = opts.trueSize && opts.trueSize[d.label] ||
+        (d.label === 'person' ? 1.7 : d.label === 'car' ? 1.8 : d.label === 'cell phone' ? 0.15 : 0.6);
+      const dist = ((trueSize * FOCAL) / (bh || 1)) * M_PX;
+
+      if (dist > SCAN_RANGE) continue;
+
+      // angle from frame center
+      const angle = Math.atan2(cx - 320, FOCAL);     // radians, +0 = right
+      const az = (u.heading || 0) - angle;           // world heading toward it
+      const px = u.x + Math.cos(az) * dist;
+      const py = u.y + Math.sin(az) * dist;
+
+      const type = map[d.label] || 'obstacle';
+      const common = {
+        x: px, y: py,
+        dist, side: sideOf(u, px, py),
+        inBubble: dist < BUBBLE.outer,
+        inCore: dist < BUBBLE.inner,
+        hazard: d.label === 'person' ? 'warn' : type === 'car' ? 'crit' : type === 'obstacle' ? 'warn' : 'info',
+        label: d.label,
+        active: true,
+        perceived: true,
+        real: true,
+        confidence: d.confidence,
+        bbox: d.bbox,
+      };
+
+      // pedestrian / car / obstacle carry enough shape for decide() to act on
+      if (type === 'pedestrian') {
+        out.push({ ...common, type, heading: az, speed: opts.assumeWalkSpeed !== false ? 1.2 : 0, radius: 12 });
+      } else if (type === 'car' || type === 'cyclist') {
+        out.push({ ...common, type, heading: az, speed: opts.assumeVehicleSpeed !== false ? 4.5 : 0, radius: 18 });
+      } else {
+        out.push({ ...common, type });
+      }
+    }
+
+    for (const e of out) detected.push(e);
+    return out;
+  }
+
   /* ---- the decision engine ---- */
   function decide(detected, u, t, opts = {}) {
     if (!state) state = { alert: null, mode: 'normal' };
@@ -284,10 +344,8 @@ SEN.Perception = (() => {
     return alert;
   }
 
-  function setState() {}
-
   return {
-    BUBBLE, decide, run, timeToImpact, sideOf, crowdFlow,
+    BUBBLE, decide, run, runReal, timeToImpact, sideOf, crowdFlow,
     get log(){ return log; },
     get spoken(){ return spoken; },
     get suppressed(){ return suppressed; },

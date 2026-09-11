@@ -19,7 +19,18 @@
       <span id="mode-badge" class="badge">GUARDIAN·ACTIVE</span>
       <span id="hr-badge" class="badge badge-hr">♥ <span id="hr-val">72</span> bpm</span>
       <span id="plane-badge" class="badge badge-plane">SENSOR: <span id="plane-state">CAMERA+ULTRASOUND</span></span>
+      <button id="camera-toggle" class="badge camera-toggle" title="Wire Sentinel's real on-device detector (YOLOv8-nano) to your webcam">🎥 CAMERA</button>
     </div>
+  </div>
+
+  <!-- Real-world camera PiP: what YOLOv8 sees, proving the perception core works on the real room -->
+  <div id="camera-pip" class="hidden">
+    <div class="camera-head">
+      <span>REAL ROOM · YOLOV8</span>
+      <span id="cv-status">MODEL LOADING…</span>
+      <button id="camera-dismiss" class="camera-close" aria-label="Close camera">✕</button>
+    </div>
+    <div id="camera-canvas"></div>
   </div>
 
   <!-- Sensor "privacy" overlay -->
@@ -122,6 +133,7 @@
       <p><b>R</b> — scan mode (object / currency / med label)</p>
       <p><b>C</b> — clap-then-whistle: Find my phone</p>
       <p><b>V</b> — open silent communication type-to-speak</p>
+      <p><b>🎥 CAMERA</b> — wire YOLOv8-nano to your webcam (real-room detection merged into the same salience filter)</p>
       <p><b>Click the world</b> — drag to look around a corner</p>
     </div>
   </div>
@@ -134,6 +146,9 @@
   <button id="silent-speak">SPEAK OUT LOUD</button>
 </div>
 
+<!-- hidden video element for the real camera stream -->
+<video id="camera-video" playsinline muted autoplay class="hidden"></video>
+
 <!-- audio: linking web audio -->
 <script src="js/audio.js"></script>
 <script src="js/scene.js"></script>
@@ -143,6 +158,8 @@
 <script src="js/pillar_memory.js"></script>
 <script src="js/pillar_social.js"></script>
 <script src="js/pillar_health.js"></script>
+<script src="js/camera.js"></script>
+<script src="js/detector.js"></script>
 <script src="js/console.js"></script>
 <script src="js/main.js"></script>
 </body>
