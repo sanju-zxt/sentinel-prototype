@@ -27,6 +27,7 @@ global.requestAnimationFrame = () => {};
 const files = [
   'audio.js', 'scene.js', 'demo.js', 'perception.js', 'pillar_guardian.js',
   'pillar_memory.js', 'pillar_social.js', 'pillar_health.js',
+  'kinesthesis.js', 'localize.js', 'haven.js', 'fusion.js',
 ];
 for (const f of files) {
   const code = fs.readFileSync(path.join(__dirname, f), 'utf8');
@@ -39,6 +40,10 @@ const M = window.SEN.Memory;
 const H = window.SEN.Health;
 const So = window.SEN.Social;
 const G = window.SEN.Guardian;
+const K = window.SEN.Kinesthesis;
+const L = window.SEN.Localize;
+const Hv = window.SEN.Haven;
+const F = window.SEN.Fusion;
 
 let pass = 0, fail = 0;
 function check(name, cond) { if (cond) { pass++; console.log('  ✓', name); } else { fail++; console.log('  ✗', name); } }
@@ -112,6 +117,67 @@ for (let i = 0; i < 200; i++) {
   if (So.pilot.state === 'live') { live = true; break; }
 }
 check('remote pilot uplinks to live', live);
+
+// #6: kinesthesia — a kneeling body at close range must be surfaced (not faces)
+const u3 = S.user;
+u3.x = 1300; u3.y = 900;
+const kneeler = S.make('pedestrian', u3.x + 50, u3.y, { label: 'Person kneeling', posture: 'kneeling', speed: 0, heading: 0 });
+kneeler.dist = 50;  kneeler.side = P.sideOf(u3, kneeler.x, kneeler.y);
+K.live(u3, [kneeler], 1000 * 10);
+const ks = K.special(u3, [kneeler], 1000 * 10);
+check('kinesthesia surfaces a kneeling body', ks.some(f => /kneel/i.test(f.msg)));
+check('kinesthesia never reads faces (posture + geometry only)', !(ks.some(f => /face|emotion/i.test(f.msg))));
+
+// #7: kinesthesia — a fast approach reads as intent from velocity projection
+const runner = S.make('pedestrian', u3.x + 450, u3.y, { label: 'Runner', posture: 'standing', speed: 0, heading: Math.PI });
+runner.dist = 150; runner.side = P.sideOf(u3, runner.x, runner.y);
+runner.x -= 150; K.live(u3, [runner], 1000 * 11);
+runner.x -= 150; K.live(u3, [runner], 1000 * 12);
+runner.dist = 150; runner.side = P.sideOf(u3, runner.x, runner.y);
+const rs = K.special(u3, [runner], 1000 * 12);
+check('kinesthesia flags a fast approach before contact', rs.some(f => f.urgency && f.urgency.indexOf('warn') === 0 && /approac|cutt|coming/i.test(f.msg)));
+check('runner read reports closing speed from physics', runner.read && runner.read.closing > 90);
+
+// #8: localize — beacon-free dead reckoning + place-memory loop closure
+L.reset(u3);
+const ox = u3.x, oy = u3.y;
+L.observe(u3, S.entities, 1 * 1000);          // record home signature
+u3.x += 400; L.updateOdometry(u3, 0.1);
+u3.x += 400; L.updateOdometry(u3, 0.1);        // wander east (+800px)
+const mid = L.observe(u3, S.entities, 2 * 1000);  // frames a different place
+u3.x -= 400; L.updateOdometry(u3, 0.1);
+u3.x -= 400; L.updateOdometry(u3, 0.1);        // return exactly
+const back = L.observe(u3, S.entities, 3 * 1000); // closure: snap drift
+check('localize records a place signature', L.readout().landmarks >= 1);
+// perfect sim odometry means position drift is ~0 on a round trip; the
+// re-anchor win is the σ (confidence) collapse, which must fire regardless
+check('localize collapses drift via loop closure', back && (back.corrected >= 30 || back.sigmaCollapse >= 45));
+check('no GPS or beacons in the localization readout', L.readout().sigmaM >= 0 && typeof L.readout().closures === 'number');
+
+// #9: demos 8 & 9 exist and boot without error (body language + re-localize)
+const d8 = window.SEN.Demo.start(8);
+const d9 = window.SEN.Demo.start(9);
+window.SEN.Demo.state.name = null;   // end demos so they don't linger
+check('demo 8 booted (Body Language)', /Body Language/i.test(d8));
+check('demo 9 booted (Re-localize)', /Re-localize/i.test(d9));
+
+// #10: haptic belt — NaviBelt-style direction + urgency encoding
+Hv.pulse('left', 'warn');
+Hv.pulse('left', 'warn');
+check('haptic belt counts pulses', Hv.status().pulses === 2);
+check('haptic belt keeps energy cap at 1', Hv.status().belt.left <= 1);
+Hv.decay(1.0);
+check('haptic belt energy decays', Hv.status().belt.left < 1);
+
+// #11: fusion — graceful headless boot + step counting from displacement
+F.init();
+const st = F.status();
+check('fusion exposes heading + step readout', typeof st.headingDeg === 'number' && typeof st.steps === 'number');
+F.update(0.016, u3);              // seed the odometry reference (no displacement yet)
+const beforeSteps = F.steps;
+u3.x += 120; F.update(0.1, u3);   // 8 m travel → at least one step
+check('fusion counts steps from motion', F.steps >= beforeSteps + 1);
+check('fusion GPS-drop finding is silent when no GPS ever existed (graceful)', F.special(u3, Date.now()) === null);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

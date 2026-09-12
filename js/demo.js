@@ -24,6 +24,8 @@ SEN.Demo = (() => {
       5: 'The Handshake (Kinesthetic)',
       6: 'Fire Alarm (Emergency)',
       7: 'Memory Palace (Persistent memory)',
+      8: 'Body Language (Kinesthesia)',
+      9: 'Re-localize (Visual SLAM-lite)',
     };
   }
 
@@ -36,12 +38,14 @@ SEN.Demo = (() => {
       '5 — HANDSHAKE. A wife arrives. Private-mode face whiskers the name, then a spatial chime guides your hand to theirs. No face analysis.',
       '6 — FIRE. Alarm. Immediate directions to the nearest EXIT + auto-sends your GPS to a care contact. Pauses only after you are safe.',
       '7 — MEMORY PALACE. "Where are my keys?" ← the exact sentence a judge will ask. It answers with where AND when — and it keeps working after this demo.',
+      '8 — BODY LANGUAGE. A fast-approaching stranger with open arms — read from velocity + posture, never faces. Then a person kneeling at knee-height nearby. Both are physics, not expressions.',
+      '9 — RE-LOCALIZE. Zero beacons, zero GPS. Walk a loop through the landmark-rich plaza and watch the LOC chip collapse as Sentinel recognizes a place it has seen before.',
     ];
     return table[i - 1];
   }
 
   function start(i) {
-    state.name = i; state.t = 0; state.end = i === 6 ? 26 : 16;
+    state.name = i; state.t = 0; state.end = i === 6 ? 26 : i === 8 ? 28 : i === 9 ? 30 : 16;
     SEN.Events.emit('demo:start', { i, name: names()[i] });
     const u = S().user;
     switch (i) {
@@ -93,6 +97,23 @@ SEN.Demo = (() => {
           SEN.Memory.seedPalace();
           setTimeout(() => SEN.Events.emit('ask', 'where are my keys'), 1200);
         }
+        break;
+      }
+      case 8: {
+        // body language: a fast approach (arms open) + a person kneeling low
+        S().make('pedestrian', u.x + 520, u.y, {
+          label: 'Approaching person', speed: 150, heading: Math.PI, radius: 14,
+          kind: 'dynamic', hazard: 'info', posture: 'standing', arms: 'open', demoOnly: true,
+        });
+        S().make('pedestrian', u.x + 80, u.y - 70, {
+          label: 'Person kneeling', speed: 0, heading: Math.PI, radius: 14,
+          kind: 'static', hazard: 'info', posture: 'kneeling', demoOnly: true,
+        });
+        break;
+      }
+      case 9: {
+        // visual-SLAM-lite: fresh odometry start; loop closure fires as you walk
+        SEN.Localize.reset(u);
         break;
       }
     }

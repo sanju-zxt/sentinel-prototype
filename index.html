@@ -3,6 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0b0d10">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <title>Sentinel — The Dark Room Simulator</title>
 <link rel="stylesheet" href="style.css">
 </head>
@@ -19,6 +24,8 @@
       <span id="mode-badge" class="badge">GUARDIAN·ACTIVE</span>
       <span id="hr-badge" class="badge badge-hr">♥ <span id="hr-val">72</span> bpm</span>
       <span id="plane-badge" class="badge badge-plane">SENSOR: <span id="plane-state">CAMERA+ULTRASOUND</span></span>
+      <span id="loc-chip" class="badge badge-loc">📍 <span id="loc-val">ACQUIRING</span></span>
+      <span id="haptic-badge" class="badge badge-haptic"> vibrating <span id="haptic-val">0</span></span>
       <button id="camera-toggle" class="badge camera-toggle" title="Wire Sentinel's real on-device detector (YOLOv8-nano) to your webcam">🎥 CAMERA</button>
     </div>
   </div>
@@ -126,14 +133,16 @@
     <div class="help-title">How to demo Sentinel</div>
     <div class="help-body">
       <p><b>WASD</b> — walk / <b>Q-E</b> — turn, or steer with <b>arrows</b></p>
-      <p><b>1-7</b> — run scripted demo scenarios</p>
+      <p><b>1-9</b> — run scripted demo scenarios (8 = body language, 9 = re-localize)</p>
       <p><b>Double-tap D</b> — uplink a Remote Pilot</p>
       <p><b>F</b> — fire alarm (Emergency Mode)</p>
       <p><b>M</b> — drop the object you're carrying</p>
       <p><b>R</b> — scan mode (object / currency / med label)</p>
       <p><b>C</b> — clap-then-whistle: Find my phone</p>
       <p><b>V</b> — open silent communication type-to-speak</p>
-      <p><b>🎥 CAMERA</b> — wire YOLOv8-nano + MiDaS depth to your webcam (real-room detection *and* real distance, merged into the same salience filter)</p>
+      <p><b>B</b> — pair a haptic motor (Web Bluetooth, feature-detect)</p>
+      <p><b>🎥 CAMERA</b> — wire YOLOv8-nano + MiDaS depth to your webcam; the depth map feeds the SLAM-lite place memory for drift-free walking</p>
+      <p><b>📍 LOC</b> — beacon-free position readout: odometry + place-memory loop closure, never GPS indoors. GPS only as a sensor-fusion fallback on mobile.</p>
       <p><b>Click the world</b> — drag to look around a corner</p>
     </div>
   </div>
@@ -161,7 +170,17 @@
 <script src="js/camera.js"></script>
 <script src="js/detector.js"></script>
 <script src="js/depth.js"></script>
+<script src="js/kinesthesis.js"></script>
+<script src="js/localize.js"></script>
+<script src="js/haven.js"></script>
+<script src="js/fusion.js"></script>
 <script src="js/console.js"></script>
 <script src="js/main.js"></script>
+<script>
+  // PWA — offline install after first visit; silent in the simulator
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+</script>
 </body>
 </html>

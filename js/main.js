@@ -32,6 +32,7 @@ SEN.Main = (() => {
     SEN.Memory.seedPalace();
     SEN.Memory.learnFace('Aisha', 'wife');
     SEN.Memory.learnFace('Meera', 'colleague');
+    SEN.Fusion.init();   // attach mobile sensors (no-op if absent)
     C().resize();
 
     wireTabs();
@@ -54,7 +55,7 @@ SEN.Main = (() => {
       <div class="h1">SENTINEL · THE DARK ROOM SIMULATOR</div>
       <div class="p">A proactive, haptic co-pilot for people who cannot see. This is not a descriptive camera — most of what happens is kept silent.</div>
       <div class="p">Walk with <b>WASD</b>, steer with <b>Q / E</b>. The world runs itself: cars, crowds, a broken escalator. Watch what Sentinel chooses to <b>interrupt</b> — and log in to the <b>Silence Log</b> to see everything it chose not to disturb.</div>
-      <div class="p" style="color:var(--dim)">Press <b>1-7</b> for a guided pillar demo. Press <b>D</b> twice for a Remote Pilot.</div>
+      <div class="p" style="color:var(--dim)">Press <b>1-9</b> for a guided pillar demo (8 = body language, 9 = re-localize). Press <b>D</b> twice for a Remote Pilot.</div>
     `);
   }
 
@@ -178,6 +179,14 @@ SEN.Main = (() => {
       }
     }
     P().runReal(detections, u, opts);
+
+    // appearance-based place memory: the live depth map fingerprints the room,
+    // and a recognized fingerprint collapses accumulated odometry drift.
+    if (depthOn) {
+      const dm = SEN.Depth.map();
+      if (dm && dm.length) SEN.Localize.realObserve(dm, performance.now());
+    }
+
     drawPip(detections);
   }
 
@@ -267,7 +276,7 @@ SEN.Main = (() => {
 
   function handleHotkey(e) {
     const k = e.key.toLowerCase();
-    if (k >= '1' && k <= '7') { startDemo(+k); return; }
+    if (k >= '1' && k <= '9') { startDemo(+k); return; }
     switch (k) {
       case 'd': {
         const now = performance.now();
@@ -298,6 +307,11 @@ SEN.Main = (() => {
       case 'g': {
         const msg = SEN.Social.toggleFocus();
         voice(msg, 'hint', { who: 'CONVERSATION FOCUS' });
+        break;
+      }
+      case 'b': {
+        const msg = SEN.Haven.bluetooth();
+        voice(msg, 'hint', { who: 'HAPTIC MOTOR' });
         break;
       }
       case 't': {
@@ -350,6 +364,12 @@ SEN.Main = (() => {
 
     const detected = P().run(S().entities, u, dt, t);
 
+    // sensor fusion + kinesthesia + beacon-free localization every frame
+    SEN.Fusion.update(dt, u);
+    SEN.Kinesthesis.live(u, detected, now);
+    SEN.Localize.updateOdometry(u, dt);
+    SEN.Haven.decay(dt);
+
     // real-world YOLO detections merge into the same perception pipeline
     // (throttled — model runs at most every ~180 ms to keep the loop smooth)
     if (camOn && detectorInitiated && now - lastDetect > 180) {
@@ -364,9 +384,13 @@ SEN.Main = (() => {
     else C().setHud({ plane: 'CAMERA+ULTRASOUND' });
 
     // specials from guardian + social + memory whisper + community tag + focus
+    // + kinesthesia (body language) + localization (loop closure) + fusion (GPS drop)
     const specials = [
       ...SEN.Guardian.special(u, detected),
       ...SEN.Social.special(u, detected),
+      ...SEN.Kinesthesis.special(u, detected, now),
+      ...SEN.Localize.special(u, detected, now),
+      SEN.Fusion.special(u, now),
       senMemoryWhisper(detected),
       communityWhisper(),
     ].filter(Boolean);
@@ -389,6 +413,11 @@ SEN.Main = (() => {
     drawMinimap(S().entities, u);
     decayHeat(dt);
 
+    // localization chip: beacon-free belief + fusion GPS status + haptic belt
+    const loc = SEN.Localize.readout();
+    const fus = SEN.Fusion.status();
+    C().renderLoc({ sigmaM: loc.sigmaM, closures: loc.closures, lost: fus.lost }, SEN.Haven.status());
+
     C().renderLog();
     C().renderMemory();
     C().renderPilot();
@@ -410,8 +439,9 @@ SEN.Main = (() => {
 
   function speakAlert(alert) {
     C().renderVoice(alert);
+    // every alert pulses through the haptic "belt" — viz + vibrate + audio pan
     const cls = alert.cue === 'crit' ? 'fire-side' : alert.cue === 'warn' ? 'warn' : 'hint';
-    C().hapticFlash(alert.side, cls);
+    SEN.Haven.pulse(alert.side, cls);
     SEN.Audio.thump(alert.cue === 'crit' ? 160 : 220, 0.11, 0.8, alert.side === 'left' ? -0.9 : alert.side === 'right' ? 0.9 : 0);
     if (alert.cue !== 'hint' || alert.urgency === 'info') {
       if (nowReasonable()) SEN.Audio.speak(alert.msg);

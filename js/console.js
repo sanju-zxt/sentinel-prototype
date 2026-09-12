@@ -235,11 +235,38 @@ SEN.Console = (() => {
     ctx.restore();
   }
 
-  /* wireframe skeleton — our way of "seeing" people without faces */
+  /* wireframe skeleton — our way of "seeing" people without faces.
+   Posture-aware: kneeling and seated people are drawn differently, because the
+   kinesthesia engine reads the same physics we render. */
   function skeleton(ctx, e, s, color, extend) {
-    const lift = e.arrived && e.handshake ? -4 : 0;
+    const posture = (e.read && e.read.posture) || e.posture;
     ctx.strokeStyle = color; ctx.lineWidth = 2;
     ctx.beginPath();
+
+    if (posture === 'kneeling') {
+      // one knee down — compact and low
+      const hs = s * 0.55;
+      ctx.arc(e.x - 3, e.y - hs * 2.2, 3.2, 0, Math.PI * 2);                 // head
+      ctx.moveTo(e.x - 3, e.y - hs * 1.3); ctx.lineTo(e.x - 4, e.y - hs * 0.2); // torso
+      ctx.moveTo(e.x - 4, e.y - hs); ctx.lineTo(e.x + hs, e.y - hs * 1.05);    // raised knee
+      ctx.moveTo(e.x - 4, e.y - hs); ctx.lineTo(e.x - hs, e.y + hs * 0.5);     // ground knee
+      ctx.moveTo(e.x - 4, e.y - hs); ctx.lineTo(e.x + hs * 0.7, e.y + hs * 0.8); // back foot
+      ctx.stroke();
+      return;
+    }
+    if (posture === 'sitting') {
+      // seated — short torso, knees forward
+      const hs = s * 0.6;
+      ctx.arc(e.x, e.y - hs - 3, 3.4, 0, Math.PI * 2);                 // head at seat height
+      ctx.moveTo(e.x, e.y - hs + 2); ctx.lineTo(e.x, e.y - hs * 0.55);  // torso
+      ctx.moveTo(e.x, e.y - hs * 0.55); ctx.lineTo(e.x + hs * 0.95, e.y - hs * 0.5); // thigh
+      ctx.moveTo(e.x + hs * 0.95, e.y - hs * 0.5); ctx.lineTo(e.x + hs * 0.6, e.y - hs * 0.05); // shin
+      ctx.moveTo(e.x, e.y - hs * 0.55); ctx.lineTo(e.x - hs * 0.5, e.y - hs * 0.15); // other leg
+      ctx.stroke();
+      return;
+    }
+
+    const lift = e.arrived && e.handshake ? -4 : 0;
     // head
     ctx.arc(e.x, e.y - s - (extend ? 10 : 0), 3.6, 0, Math.PI * 2); ctx.stroke();
     // torso
@@ -274,6 +301,27 @@ SEN.Console = (() => {
     el.classList.remove('fire', 'fire-side', 'warn', 'hint', 'green');
     void el.offsetWidth;   // reflow to restart animation
     el.classList.add(cls || 'warn');
+  }
+
+  /* ---------- localization + haptic HUD ---------- */
+  function renderLoc(loc, haptic) {
+    const val = $('loc-val');
+    if (!val) return;
+    const chip = $('loc-chip');
+    if (loc.lost) {
+      val.textContent = 'GPS LOST · DR';
+      chip.classList.add('lost');
+      chip.title = 'GNSS dropped — fusing compass + odometry until the next visual anchor';
+    } else {
+      val.textContent = `${loc.sigmaM.toFixed(1)}m σ · ${loc.closures} recall${loc.closures === 1 ? '' : 's'}`;
+      chip.classList.remove('lost');
+      chip.title = 'Beacon-free position belief · place-memory loop closure';
+    }
+    const hv = $('haptic-val');
+    if (hv) hv.textContent = haptic.pulses;
+    const belt = haptic.belt || {};
+    $('haptic-badge').classList.toggle('pulsing',
+      (belt.left || 0) + (belt.right || 0) + (belt.front || 0) + (belt.back || 0) > 0.4);
   }
 
   /* ---------- voice banner + synth ---------- */
@@ -400,6 +448,6 @@ SEN.Console = (() => {
 
   function toast(text) { SEN.Events.emit('toast', text); }
 
-  return { resize, drawWorld, renderSeebar, hapticFlash, renderVoice, renderLog, renderMemory, renderPilot, renderHealth, setHud, showPrivacy, toast,
+  return { resize, drawWorld, renderSeebar, hapticFlash, renderLoc, renderVoice, renderLog, renderMemory, renderPilot, renderHealth, setHud, showPrivacy, toast,
            get W(){ return W; }, get H(){ return H; } };
 })();

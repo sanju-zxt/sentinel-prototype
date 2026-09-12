@@ -104,6 +104,18 @@ SEN.Scene = (() => {
     make('bench', W*0.40, H*0.40, { label: 'Bench', radius: 30, ipc: 'LANDMARK' });
     make('cafe', W*0.70, H*0.35, { label: 'Café (Aroma)', radius: 60, ipc: 'LANDMARK' });
 
+    // seeded posture (kinesthetic sensing): someone seated on the bench, someone
+    // kneeling by the pothole. No `arms` — arms are only ever a *witnessed*
+    // observation (demo 8), never seeded randomly, so body language stays real.
+    make('pedestrian', W*0.40 - 75, H*0.40 + 40, {
+      label: 'Person seated', speed: 0, heading: 0, radius: 14,
+      kind: 'static', hazard: 'info', posture: 'sitting',
+    });
+    make('pedestrian', W*0.72 - 62, H*0.88, {
+      label: 'Person kneeling', speed: 0, heading: 0, radius: 14,
+      kind: 'static', hazard: 'info', posture: 'kneeling',
+    });
+
     // produce stand (memory palace scanner demo: cucumber vs zucchini)
     make('produce', W*0.70, H*0.47, { label: 'Cucumber', subtype: 'cucumber', radius: 18 });
     make('produce', W*0.715, H*0.47, { label: 'Zucchini', subtype: 'zucchini', radius: 18 });

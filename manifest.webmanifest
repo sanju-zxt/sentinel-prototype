@@ -1,0 +1,35 @@
+{
+  "name": "Sentinel — Haptic Co-Pilot",
+  "short_name": "Sentinel",
+  "description": "Proactive haptic co-pilot for blind/visually impaired navigation. Camera + depth + place memory + body language, zero beacons.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0b0d10",
+  "theme_color": "#0b0d10",
+  "icons": [
+    {
+      "src": "assets/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["medical", "navigation", "accessibility"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Walk mode",
+      "short_name": "Walk",
+      "description": "Start navigation with live haptics",
+      "url": "./index.html?mode=walk"
+    },
+    {
+      "name": "Simulator",
+      "short_name": "Sim",
+      "description": "Run the desktop demo with keyboard scenarios",
+      "url": "./index.html?mode=sim"
+    }
+  ],
+  "prefer_related_applications": false
+}

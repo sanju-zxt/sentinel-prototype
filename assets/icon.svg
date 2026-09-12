@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" fill="none">
+  <!-- Background circle -->
+  <circle cx="96" cy="96" r="90" fill="#0b0d10"/>
+  <!-- Outer pulse ring -->
+  <circle cx="96" cy="96" r="84" stroke="#00e5a0" stroke-width="6" fill="none" opacity="0.4"/>
+  <!-- Inner accent ring -->
+  <circle cx="96" cy="96" r="58" stroke="#00e5a0" stroke-width="3" fill="none"/>
+  <!-- Center dot = the user -->
+  <circle cx="96" cy="96" r="10" fill="#00e5a0"/>
+  <!-- Four directional pips (NaviBelt encoding) -->
+  <circle cx="96" cy="24" r="6" fill="#00e5a0" opacity="0.9"/>  <!-- front -->
+  <circle cx="168" cy="96" r="6" fill="#00e5a0" opacity="0.7"/>  <!-- right -->
+  <circle cx="96" cy="168" r="6" fill="#00e5a0" opacity="0.7"/>  <!-- back -->
+  <circle cx="24" cy="96" r="6" fill="#00e5a0" opacity="0.7"/>  <!-- left -->
+</svg>

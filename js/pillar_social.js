@@ -69,7 +69,8 @@ SEN.Social = (() => {
       const dx = p.x - user.x, dy = p.y - user.y;
       const d = Math.hypot(dx, dy) || 1;
       p.frontDist = (dx * Math.cos(user.heading) + dy * Math.sin(user.heading)) / d;
-      if (p.arms === undefined) p.arms = (Math.random() < 0.4) ? (Math.random() < 0.5 ? 'open' : 'crossed') : null;
+      // arms are NEVER invented — only demo 8 / scene place them as explicit
+      // metadata. Kinesthesia (SEN.Kinesthesis) reads what is actually there.
     }
     const hs = handshakeCandidate(detected);
     if (hs && hs.welcomed !== true) {

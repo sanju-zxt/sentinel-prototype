@@ -130,7 +130,13 @@ SEN.Perception = (() => {
 
       // pedestrian / car / obstacle carry enough shape for decide() to act on
       if (type === 'pedestrian') {
-        out.push({ ...common, type, heading: az, speed: opts.assumeWalkSpeed !== false ? 1.2 : 0, radius: 12 });
+        // box-lite posture proxy (tall+thin = upright) feeding the kinesthesia
+        // engine — the MediaPipe-free way to keep body language on real frames.
+        const ar = (d.bbox[3] || 1) / (d.bbox[2] || 1);
+        out.push({
+          ...common, type, heading: az, speed: opts.assumeWalkSpeed !== false ? 1.2 : 0, radius: 12,
+          posture: ar >= 1.75 ? 'standing' : ar >= 1.25 ? 'leaning' : 'sitting',
+        });
       } else if (type === 'car' || type === 'cyclist') {
         out.push({ ...common, type, heading: az, speed: opts.assumeVehicleSpeed !== false ? 4.5 : 0, radius: 18 });
       } else {

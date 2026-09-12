@@ -50,13 +50,14 @@ Or just open `index.html` directly in your browser.
 |---|---|
 | **W / S** | Move forward / back |
 | **Q / E** or **← / →** | Turn left / right |
-| **1 – 7** | Launch demo scenarios (traffic, crowd, escalator...) |
+| **1 – 9** | Launch demo scenarios (1–7 pillars, 8 body language, 9 re-localize) |
 | **D** | Remote pilot mode |
 | **F** | Fire / alert |
 | **M** | Drop item |
 | **R** | Scanner mode |
 | **C** | Find phone |
 | **G** | Focus |
+| **B** | Together a haptic motor (Web Bluetooth, feature-detected) |
 
 ### Pillar tabs
 
@@ -88,6 +89,13 @@ js/
   camera.js           getUserMedia stream manager (webcam)
   detector.js         YOLOv8-nano ONNX inference + NMS (on-device)
   depth.js            MiDaS v3.0-small monocular depth → real meters (on-device)
+  kinesthesis.js      Skeleton-agnostic body language (posture, gait, approach intent)
+  localize.js         Beacon-free visual-SLAM-lite (dead reckoning + loop closure)
+  haven.js            Haptic "belt" — NaviBelt direction+urgency → vibrate + viz
+  fusion.js           Real-world sensor fusion (GPS, compass, accelerometer)
+
+PWA wrapper: manifest.webmanifest, sw.js (offline-first), assets/icon.svg,
+capacitor.config.json (native Android/iOS shell).
 ```
 
 The core of Sentinel is the **perception filter** — not the world simulation, not the haptics. The filter is what makes Sentinel different from every other assistive tech that narrates everything. It watches, scores, and chooses silence.
@@ -149,12 +157,24 @@ No depth model? The app flags it once and keeps running on YOLO-only box-height 
 
 - [x] Real-time object detection via YOLOv8-nano (on-device, webcam) — **done in-browser**
 - [x] Competitive analysis — **see `COMPETITIVE_ANALYSIS.md`**
-- [ ] MediaPipe skeletal tracking for crowd flow analysis + kinesthetic body language
+- [x] MediaPipe skeletal tracking for crowd flow analysis + kinesthetic body language — **done as `kinesthesis.js`**. Full MediaPipe model-landmarks can drop into `SEN.Kinesthesis.attach()` later; the physics layer (posture, gait, approach intent) already works from YOLO boxes / sim metadata — no faces, deterministic, testable.
 - [x] ~~MiDaS depth estimation for distance perception~~ — **done: real meters via `depth.js`**
-- [ ] Beacon-free indoor positioning (visual SLAM) — NavCog requires $10k+ of beacons; we won't
-- [ ] Hardware integration (LiDAR-equipped phones, haptic wearables — NaviBelt proves insurance reimbursement exists)
-- [ ] Native mobile wrapper (Capacitor / React Native)
-- [ ] Real-world sensor fusion (GPS, compass, accelerometer)
+- [x] Beacon-free indoor positioning (visual SLAM) — **done as `localize.js`**. Dead-reckoning odometry + appearance-based place memory (landmark geometry in sim, a 4×4 MiDaS depth-sector fingerprint in camera mode). Loop closure collapses drift — no beacons, no GPS.
+- [x] Hardware integration (LiDAR-equipped phones, haptic wearables) — **done as `haven.js`**. Every alert pulses direction+urgency (NaviBelt encoding) through `navigator.vibrate`, Web Audio spatial pan, and the on-screen belt ring; optional Web Bluetooth motor pairing behind feature detection.
+- [x] Native mobile wrapper (Capacitor / React Native) — **done as a Capacitor scaffold** (`capacitor.config.json`) + installable/offline PWA (`manifest.webmanifest`, `sw.js`, icon).
+- [x] Real-world sensor fusion (GPS, compass, accelerometer) — **done as `fusion.js`**. Geolocation watch + device compass heading + accelerometer step count, merged with the SLAM readout; graceful when sensors are absent.
+
+### New modules & demo scenarios
+
+| Key | Demo | What it proves |
+|---|---|---|
+| **8** | Body Language | Fast approach + kneeling body surfaced from *physics* (velocity projection, posture), never faces |
+| **9** | Re-localize | Walk a loop; the **📍 LOC** chip's σ collapses when Sentinel re-anchors on a place it has seen |
+
+- **Kinesthesia** (`kinesthesis.js`) — posture (`sitting`/`kneeling`/`leaning`/`standing`), approach intent from velocity-onto-radial projection, erratic-gait detection. The wired-figure crowd in the world now renders seated and kneeling people distinctly.
+- **Localization** (`localize.js`) — position belief with a σ (uncertainty) that grows with distance walked and collapses on place-memory match. Indoor, zero infrastructure.
+- **Haptic belt** (`haven.js`) — left/right/front/back tap patterns + urgency suffix; pulse counter and belt energy live in the HUD (`vibrating 17`).
+- **Sensor fusion** (`fusion.js`) — the **📍 LOC** chip reads GPS/compass accents on mobile; a spoken finding fires if a real GPS vanishes mid-walk. In the desktop sim it runs odometry + sim heading, so the chip is never dead.
 
 ## Built for People Who Need It
 

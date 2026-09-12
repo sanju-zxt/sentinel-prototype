@@ -37,6 +37,10 @@ body{
 .badge-hr{color:var(--cyan);border-color:rgba(55,226,255,.35)}
 .badge-plane{color:var(--green);border-color:rgba(67,245,168,.3)}
 .badge-plane.dim-mode{color:var(--violet);border-color:rgba(155,123,255,.4)}
+.badge-loc{color:var(--amber);border-color:rgba(255,194,77,.35);min-width:150px;text-align:center}
+.badge-loc.lost{color:var(--red);border-color:rgba(255,77,94,.5);animation:shieldPulse 1.3s infinite}
+.badge-haptic{color:var(--violet);border-color:rgba(155,123,255,.35)}
+.badge-haptic.pulsing{border-color:rgba(155,123,255,.9);color:var(--ink);animation:shieldPulse .5s infinite}
 
 /* PRIVACY SHIELD */
 #privacy-layer{position:absolute;inset:0;z-index:9;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
