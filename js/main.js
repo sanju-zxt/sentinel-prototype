@@ -14,9 +14,13 @@ SEN.Main = (() => {
   let lastD = 0;   // for double-tap D
   let lastHint = 0;
 
-  // --- real-world camera + YOLOv8 ---
+  // --- real-world camera + YOLOv8 + MiDaS depth ---
   let camOn = false;                 // camera stream active?
   let detectorInitiated = false;     // tried to load ONNX model yet?
+  let depthInitiated = false;        // tried to load MiDaS yet?
+  let depthOn = false;               // MiDaS session live + fused into pipeline
+  let lastDepthWarn = 0;             // cooldown for the arm's-reach guard
+  let lastDists = null;              // last MiDaS meters (for PiP labels)
   let lastDetect = 0;                // frame-throttle timestamp
   const DETECT_INTERVAL = 180;       // ms between YOLO inferences
   const CAM_INPUT = document.createElement('canvas');  // 640×640 detector input
@@ -122,15 +126,34 @@ SEN.Main = (() => {
     document.getElementById('camera-pip').classList.remove('hidden');
     document.getElementById('cv-status').textContent = 'YOLOV8-NANO ACTIVE';
     setHudSensor();
+
+    // depth is a graceful upgrade: if MiDaS is missing we still run on YOLO
+    if (!depthInitiated) {
+      depthInitiated = true;
+      document.getElementById('cv-status').textContent = 'YOLO+ DEPTH LOADING…';
+      const dep = await SEN.Depth.init('midas.onnx');
+      depthOn = dep === 'ready';
+      if (dep === 'no-model') {
+        document.getElementById('cv-status').textContent = 'YOLO · no midas.onnx (depth off)';
+        voice('Detection online in camera mode, but no MiDaS depth model found. Place midas.onnx in the project folder to upgrade distance sensing — see the README.', 'hint', { who: 'REAL-WORLD CAMERA' });
+      } else if (dep === 'ready') {
+        document.getElementById('cv-status').textContent = 'YOLO + DEPTH · MIDAS';
+        voice('Depth sensor online. I am not just seeing objects now — I know how far they are.', 'hint', { who: 'REAL-WORLD CAMERA' });
+      } else {
+        document.getElementById('cv-status').textContent = 'YOLO · depth failed';
+      }
+    }
+
     voice('Camera online. I am watching the real room now — same silence rule applies.', 'hint', { who: 'REAL-WORLD CAMERA' });
   }
 
   function setHudSensor() {
     const b = document.getElementById('plane-state');
-    if (b) b.textContent = camOn ? 'CAMERA+YOLO' : 'CAMERA+ULTRASOUND';
+    if (b) b.textContent = !camOn ? 'CAMERA+ULTRASOUND'
+      : depthOn ? 'CAMERA+YOLO+DEPTH' : 'CAMERA+YOLO';
   }
 
-  // snapshot → detect → merge into perception (runReal adds to `detected`)
+  // snapshot → detect (+ depth) → merge into perception (runReal adds to `detected`)
   function realSense(dt) {
     if (!camOn) return;
     const img = SEN.Camera.snapshot(CAM_INPUT);
@@ -139,7 +162,22 @@ SEN.Main = (() => {
     if (!detections || !detections.length) return;
 
     const u = S().user;
-    P().runReal(detections, u, {});
+    const opts = {};
+    if (depthOn) {
+      // MiDaS runs in the same throttle; distances are parallel to detections
+      opts.distances = lastDists = SEN.Depth.measure(img, detections);
+      // true metric distance → the "at hand's reach" guard (deduped: once per 4 s)
+      const near = detections
+        .map((d, i) => ({ d, m: opts.distances[i] }))
+        .filter(x => x.m != null)
+        .sort((a, b) => a.m - b.m)[0];
+      const nowMs = performance.now();
+      if (near && near.m < 1.2 && nowMs - lastDepthWarn > 4000) {
+        lastDepthWarn = nowMs;
+        voice(`Held at arm's reach — ${near.d.label} is ${(near.m * 100).toFixed(0)} centimeters away.`, 'warn', { who: 'DEPTH SENSOR' });
+      }
+    }
+    P().runReal(detections, u, opts);
     drawPip(detections);
   }
 
@@ -154,6 +192,27 @@ SEN.Main = (() => {
     c.width = 300;
     c.height = (v.videoHeight / v.videoWidth) * 300;
     ctx.drawImage(v, 0, 0, c.width, c.height);
+
+    // depth heatmap: a colour wash under the boxes so the operator SEES that
+    // Sentinel knows distance. teal = near → magenta = far.
+    if (depthOn && SEN.Depth.map()) {
+      const dm = SEN.Depth.map();           // 640×640 pseudo-range, larger = farther
+      const sw = c.width / 640, sh = c.height / 640;
+      const cell = 4;                        // <4×4 px blocks for the wash
+      for (let by = 0; by < 640; by += cell) {
+        for (let bx = 0; bx < 640; bx += cell) {
+          let acc = 0;
+          for (let yy = 0; yy < cell; yy++) {
+            const row = (by + yy) * 640;
+            for (let xx = 0; xx < cell; xx++) acc += dm[row + bx + xx];
+          }
+          const t = acc / (cell * cell);     // 0 near → 1 far
+          ctx.fillStyle = `rgba(${Math.round(60 + t * 120)}, ${Math.round(230 - t * 190)}, ${Math.round(240 - t * 210)}, 0.5)`;
+          ctx.fillRect(bx * sw, by * sh, cell * sw + 1, cell * sh + 1);
+        }
+      }
+    }
+
     const sx = c.width / v.videoWidth, sy = c.height / v.videoHeight;
     for (const d of dets) {
       const [bx, by, bw, bh] = d.bbox;
@@ -161,6 +220,15 @@ SEN.Main = (() => {
       ctx.lineWidth = 2;
       ctx.strokeRect(bx * sx, by * sy, bw * sx, bh * sy);
       ctx.fillStyle = ctx.strokeStyle;
+      ctx.font = 'bold 11px sans-serif';
+      // real distance from MiDaS when available — labeled under the box
+      if (depthOn && lastDists && lastDists[i] != null) {
+        ctx.font = 'bold 13px sans-serif';
+        ctx.fillText(
+          `${lastDists[i].toFixed(1)} m`,
+          bx * sx + 3, Math.min(c.height - 3, (by + bh) * sy - 3)
+        );
+      }
       ctx.font = 'bold 11px sans-serif';
       ctx.fillText(
         `${d.label} ${Math.round(d.confidence * 100)}%`,

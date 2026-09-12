@@ -87,6 +87,7 @@ js/
   pillar_health.js    Heart rate simulation (rPPG)
   camera.js           getUserMedia stream manager (webcam)
   detector.js         YOLOv8-nano ONNX inference + NMS (on-device)
+  depth.js            MiDaS v3.0-small monocular depth → real meters (on-device)
 ```
 
 The core of Sentinel is the **perception filter** — not the world simulation, not the haptics. The filter is what makes Sentinel different from every other assistive tech that narrates everything. It watches, scores, and chooses silence.
@@ -129,12 +130,27 @@ Then place the resulting `yolov8n.onnx` next to `index.html`. The detector hot-c
 
 > Tip: use a **facingMode:environment** (rear) camera on a phone for best street-like results.
 
+### Adding real distance (MiDaS depth)
+
+YOLO alone estimates distance from box height — an assumption. **MiDaS v3.0-small** gives Sentinel a real per-pixel depth map from the same single camera, and each frame is anchored to metric scale using the YOLO boxes (relative depth → meters). The PiP shows a teal→magenta depth wash, and every box gets a live **meters** label.
+
+```bash
+pip install ultralytics
+yolo export model=midas_v3.0-small.pt format=onnx imgsz=384 opset=12
+# or download any MiDaS v3.0-small ONNX export
+mv midas_v3.0-small.onnx midas.onnx   # → next to index.html
+```
+
+No depth model? The app flags it once and keeps running on YOLO-only box-height estimation — silence-first, graceful by design.
+
+- [x] Depth perception via MiDaS (real meters, on-device, fused with YOLO) — **done in-browser**
+
 ## Roadmap
 
 - [x] Real-time object detection via YOLOv8-nano (on-device, webcam) — **done in-browser**
 - [x] Competitive analysis — **see `COMPETITIVE_ANALYSIS.md`**
 - [ ] MediaPipe skeletal tracking for crowd flow analysis + kinesthetic body language
-- [ ] MiDaS depth estimation for distance perception (closes the "head-height branch" gap no cane covers)
+- [x] ~~MiDaS depth estimation for distance perception~~ — **done: real meters via `depth.js`**
 - [ ] Beacon-free indoor positioning (visual SLAM) — NavCog requires $10k+ of beacons; we won't
 - [ ] Hardware integration (LiDAR-equipped phones, haptic wearables — NaviBelt proves insurance reimbursement exists)
 - [ ] Native mobile wrapper (Capacitor / React Native)

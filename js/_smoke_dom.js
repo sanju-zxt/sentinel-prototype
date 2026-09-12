@@ -42,7 +42,7 @@ global.AudioContext = function(){ return { state:'running', destination:{}, curr
 function node(){ return { connect:()=>node(), gain:{value:0, setValueAtTime(){}, exponentialRampToValueAtTime(){}, linearRampToValueAtTime(){}},
   frequency:{value:0,setValueAtTime(){},exponentialRampToValueAtTime(){}}, type:'', pan:{value:0}, start(){}, stop(){}, disconnect(){} }; }
 
-const files = ['audio.js','scene.js','demo.js','perception.js','pillar_guardian.js','pillar_memory.js','pillar_social.js','pillar_health.js','camera.js','detector.js','console.js','main.js'];
+const files = ['audio.js','scene.js','demo.js','perception.js','pillar_guardian.js','pillar_memory.js','pillar_social.js','pillar_health.js','camera.js','detector.js','depth.js','console.js','main.js'];
 for (const f of files) { try { eval(fs.readFileSync('js/'+f,'utf8')); } catch(e){ console.error('LOAD FAIL', f, e.stack); process.exit(1); } }
 
 // run frames by pumping rAF

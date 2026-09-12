@@ -85,17 +85,25 @@ SEN.Perception = (() => {
     const M_PX = opts.mPerPixel || 26;     // simulated world px per real meter
     const out = [];
     const map = (window.SEN.Detector && window.SEN.Detector.CLASS_MAP) || {};
+    // parallel real-distance array (meters) from MiDaS, index-matched to detections
+    const meters = opts.distances || null;
 
-    for (const d of detections) {
+    for (let i = 0; i < detections.length; i++) {
+      const d = detections[i];
       const [bx, by, bw, bh] = d.bbox;
       const cx = bx + bw / 2;
       const cy = by + bh / 2;
 
-      // distance from apparent size: assume a nominal object "true size"
-      // per class so bigger boxes are closer. Convert meters → world px.
+      // distance: prefer true metric depth from MiDaS when present. MiDaS gives
+      // absolute meters per-pixel; the bbox-height heuristic is the fallback
+      // (and also the relative→metric anchor used upstream).
       const trueSize = opts.trueSize && opts.trueSize[d.label] ||
         (d.label === 'person' ? 1.7 : d.label === 'car' ? 1.8 : d.label === 'cell phone' ? 0.15 : 0.6);
-      const dist = ((trueSize * FOCAL) / (bh || 1)) * M_PX;
+      const heuristic = ((trueSize * FOCAL) / (bh || 1)) * M_PX;
+      const metric = meters && meters[i] != null ? meters[i] : null;
+      const dist = metric != null
+        ? Math.min(Math.max(metric * M_PX, 3), 9000)
+        : heuristic;
 
       if (dist > SCAN_RANGE) continue;
 
