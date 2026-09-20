@@ -6,6 +6,9 @@ Thumbs.db
 *.log
 *.onnx
 
+# office lock/temp files (opened locally, never for the repo)
+~$*
+
 # research scratch (competitive-analysis scraping - not part of the product)
 ddg1.html
 hc.html
