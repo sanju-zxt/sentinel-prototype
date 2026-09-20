@@ -1,0 +1,26 @@
+{
+  "appId": "app.sentinel.prototype",
+  "appName": "Sentinel",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  },
+  "ios": {
+    "contentInset": "automatic",
+    "scrollEnabled": true
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 0
+    },
+    "Geolocation": {
+      "enableHighAccuracy": true
+    },
+    "DeviceMotion": {},
+    "DeviceOrientation": {},
+    "Bluetooth": {}
+  }
+}

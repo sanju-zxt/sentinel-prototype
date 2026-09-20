@@ -1,0 +1,26 @@
+{
+  "name": "sentinel-haptic-copilot",
+  "version": "0.1.0",
+  "description": "Sentinel — proactive haptic co-pilot for blind/visually impaired navigation. Native shell: Capacitor over an offline-first PWA.",
+  "private": true,
+  "scripts": {
+    "build:web": "node tools/build-www.js",
+    "sync": "npm run build:web && cap sync",
+    "serve": "npx serve ."
+  },
+  "keywords": [
+    "accessibility",
+    "haptics",
+    "pwa",
+    "capacitor"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@capacitor/core": "^8"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/cli": "^8.5.2",
+    "playwright-core": "^1.63.0"
+  }
+}

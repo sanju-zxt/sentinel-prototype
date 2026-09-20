@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d10">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sentinel">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png">
+<title>Sentinel — The Dark Room Simulator</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ============ THE SIMULATION WORLD (main canvas) ============ -->
+<div id="world-wrap">
+  <canvas id="world"></canvas>
+
+  <!-- HUD top strip -->
+  <div id="hud">
+    <div class="brand">SEN<span class="dim">TINEL</span></div>
+    <div class="hud-status">
+      <span id="mode-badge" class="badge">GUARDIAN·ACTIVE</span>
+      <span id="hr-badge" class="badge badge-hr">♥ <span id="hr-val">72</span> bpm</span>
+      <span id="plane-badge" class="badge badge-plane">SENSOR: <span id="plane-state">CAMERA+ULTRASOUND</span></span>
+      <span id="loc-chip" class="badge badge-loc">📍 <span id="loc-val">ACQUIRING</span></span>
+      <span id="haptic-badge" class="badge badge-haptic"> vibrating <span id="haptic-val">0</span></span>
+      <button id="camera-toggle" class="badge camera-toggle" title="Wire Sentinel's real on-device detector (YOLOv8-nano) to your webcam">🎥 CAMERA</button>
+      <button id="voice-toggle" class="badge camera-toggle" title="Talk to Sentinel — ask for your keys, launch a demo, or switch on turn-by-turn guidance">🎙️ VOICE</button>
+    </div>
+  </div>
+
+  <!-- Real-world camera PiP: what YOLOv8 sees, proving the perception core works on the real room -->
+  <div id="camera-pip" class="hidden">
+    <div class="camera-head">
+      <span>REAL ROOM · YOLOV8</span>
+      <span id="cv-status">MODEL LOADING…</span>
+      <button id="camera-dismiss" class="camera-close" aria-label="Close camera">✕</button>
+    </div>
+    <div id="camera-canvas"></div>
+  </div>
+
+  <!-- Sensor "privacy" overlay -->
+  <div id="privacy-layer" class="hidden">
+    <div class="shield-icon">◉</div>
+    <div class="shield-text">PRIVACY SHIELD ACTIVE<br><span>Camera off — Ultrasonic mode</span></div>
+  </div>
+
+  <!-- Visual "voice" banner -->
+  <div id="voice-banner" class="banner hidden"></div>
+
+  <!-- Haptic pulse flashes (left/right/front/back) -->
+  <div id="haptics" aria-hidden="true">
+    <div class="pulse left" data-side="left"></div>
+    <div class="pulse right" data-side="right"></div>
+    <div class="pulse front" data-side="front"></div>
+    <div class="pulse back" data-side="back"></div>
+  </div>
+
+  <!-- crosshair + minimap -->
+  <div id="crosshair"></div>
+  <canvas id="minimap" width="160" height="110"></canvas>
+
+  <!-- contextual "what I see" wireframe strip (skeleton world) -->
+  <div id="seebar">
+    <div class="seebar-label">WHAT I PERCEIVE</div>
+    <div id="seebar-view"></div>
+  </div>
+</div>
+
+<!-- ============ RIGHT CONSOLE ============ -->
+<div id="console">
+  <div class="tabbar">
+    <button class="tab active" data-tab="pitch">PITCH</button>
+    <button class="tab" data-tab="log">SILENCE LOG</button>
+    <button class="tab" data-tab="memory">MEMORY PALACE</button>
+    <button class="tab" data-tab="pilot">REMOTE PILOT</button>
+    <button class="tab" data-tab="health">HEALTH</button>
+    <button class="tab" data-tab="help">HELP</button>
+  </div>
+
+  <!-- PITCH / live story -->
+  <div id="panel-pitch" class="panel">
+    <div id="story"></div>
+    <div id="voice-stream"></div>
+  </div>
+
+  <!-- SILENCE LOG -->
+  <div id="panel-log" class="panel hidden">
+    <div class="log-stats">
+      <div class="stat"><span class="big" id="stat-spoken">0</span><span class="lbl">SPOKEN</span></div>
+      <div class="stat"><span class="big" id="stat-detected">0</span><span class="lbl">DETECTED</span></div>
+      <div class="stat"><span class="big" id="stat-suppressed">0</span><span class="lbl">KEPT SILENT</span></div>
+    </div>
+    <div class="log-sub">Every event. Every decision. That's the difference between an AI that narrates the street and one that saves you from it.</div>
+    <div id="log-list"></div>
+  </div>
+
+  <!-- MEMORY PALACE -->
+  <div id="panel-memory" class="panel hidden">
+    <div class="panel-intro">I map your space over time. Ask me where something is — I remember where & when.</div>
+    <div class="prompt-row">
+      <input id="mem-input" placeholder='Try: "where are my keys"' autocomplete="off">
+      <button id="mem-ask">Ask</button>
+    </div>
+    <div id="mem-answer" class="mem-answer"></div>
+    <div id="mem-objects"></div>
+  </div>
+
+  <!-- REMOTE PILOT -->
+  <div id="panel-pilot" class="panel hidden">
+    <div class="pilot-status" id="pilot-status">TAP TWICE ANYWHERE IN THE WORLD TO UPLINK A HUMAN PILOT</div>
+    <div id="pilot-feed">
+      <div class="pilot-feed-blur">FEED ANONYMIZED<br><span>face-blurred · no name · no face</span></div>
+      <div class="pilot-feed-skel" id="pilot-skels"></div>
+    </div>
+    <div id="pilot-transcript"></div>
+  </div>
+
+  <!-- HEALTH -->
+  <div id="panel-health" class="panel hidden">
+    <canvas id="health-plot" height="130"></canvas>
+    <div id="health-readout"></div>
+    <div id="health-events"></div>
+    <div class="health-rows">
+      <div class="hrow"><span>Bus 22</span><span id="bus-state">arriving in 2 min · doors 10 m ahead</span></div>
+      <div class="hrow"><span>Environment</span><span id="env-state">dry · 22°C</span></div>
+    </div>
+  </div>
+
+  <!-- HELP -->
+  <div id="panel-help" class="panel hidden">
+    <div class="help-title">How to demo Sentinel</div>
+    <div class="help-body">
+      <p><b>WASD</b> — walk / <b>Q-E</b> — turn, or steer with <b>arrows</b></p>
+      <p><b>1-9</b> — guide me through scripted scenarios; <b>8</b> = body language, <b>9</b> = re-localize</p>
+      <p><b>0</b> — AUTO TOUR: Sentinel walks the plaza itself, hands-free</p>
+      <p><b>N</b> — turn-by-turn navigation (press again to stop)</p>
+      <p><b>🎙️ VOICE</b> — ask things out loud: "where are my keys", "run demo 6", "guide me"</p>
+      <p><b>Double-tap D</b> — uplink a Remote Pilot</p>
+      <p><b>F</b> — fire alarm (Emergency Mode)</p>
+      <p><b>M</b> — drop the object you're carrying</p>
+      <p><b>R</b> — scan mode (object / currency / med label)</p>
+      <p><b>C</b> — clap-then-whistle: Find my phone</p>
+      <p><b>V</b> — open silent communication type-to-speak</p>
+      <p><b>B</b> — pair a haptic motor (Web Bluetooth, feature-detect)</p>
+      <p><b>🎥 CAMERA</b> — wire YOLOv8-nano + MiDaS depth to your webcam; the depth map feeds the SLAM-lite place memory for drift-free walking</p>
+      <p><b>📍 LOC</b> — beacon-free position readout: odometry + place-memory loop closure, never GPS indoors. GPS only as a sensor-fusion fallback on mobile.</p>
+      <p><b>Click the world</b> — drag to look around a corner</p>
+    </div>
+  </div>
+</div>
+
+<!-- silent communication modal -->
+<div id="silent-modal" class="hidden">
+  <div class="modal-title">SILENT COMMUNICATION</div>
+  <textarea id="silent-input" placeholder="Type what you want spoken to those around you…"></textarea>
+  <button id="silent-speak">SPEAK OUT LOUD</button>
+</div>
+
+<!-- hidden video element for the real camera stream -->
+<video id="camera-video" playsinline muted autoplay class="hidden"></video>
+
+<!-- audio: linking web audio -->
+<script src="js/audio.js"></script>
+<script src="js/scene.js"></script>
+<script src="js/demo.js"></script>
+<script src="js/perception.js"></script>
+<script src="js/pillar_guardian.js"></script>
+<script src="js/pillar_memory.js"></script>
+<script src="js/pillar_social.js"></script>
+<script src="js/pillar_health.js"></script>
+<script src="js/camera.js"></script>
+<script src="js/detector.js"></script>
+<script src="js/depth.js"></script>
+<script src="js/kinesthesis.js"></script>
+<script src="js/localize.js"></script>
+<script src="js/haven.js"></script>
+<script src="js/voice.js"></script>
+<script src="js/guide.js"></script>
+<script src="js/fusion.js"></script>
+<script src="js/console.js"></script>
+<script src="js/main.js"></script>
+<script>
+  // PWA — offline install after first visit; silent in the simulator
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+</script>
+</body>
+</html>

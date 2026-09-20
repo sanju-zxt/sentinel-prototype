@@ -1,0 +1,29 @@
+node_modules/
+www/
+android/
+.DS_Store
+Thumbs.db
+*.log
+*.onnx
+
+# research scratch (competitive-analysis scraping - not part of the product)
+ddg1.html
+hc.html
+envis_blog.html
+envis_reviews.json
+lookout_bing.html
+lookout_desc.txt
+lookout_play.html
+lookout_reviews.json
+reddit1.json
+reddit_lookout.txt
+reddit_old.txt
+parse_desc.py
+parse_desc2.py
+parse_lookout.py
+_shot_check.png
+
+# regenerable demo recordings - shipped as GitHub release assets
+tools/demo-rec/out/
+tools/demo-rec/rec/
+tools/demo-rec/tts/
