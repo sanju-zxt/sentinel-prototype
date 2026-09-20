@@ -3,7 +3,7 @@
  * Caches all static assets on first load so the prototype runs entirely
  * offline after one visit. No build step, no network dependency.
  */
-const CACHE = 'sentinel-v4';
+const CACHE = 'sentinel-v5';
 const ASSETS = [
   './',
   './index.html',

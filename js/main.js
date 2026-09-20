@@ -46,6 +46,7 @@ SEN.Main = (() => {
     wireEvents();
     wireVoice();
     wireGuide();
+    wireTouch();
 
     introStory();
 
@@ -353,6 +354,96 @@ SEN.Main = (() => {
     C().renderMemory();
   }
 
+  /* ---------- touch (phones) ---------- */
+  const touchNav = { fwd: 0, turn: 0, id: -1, sx: 0, sy: 0, st: 0, moved: false };
+
+  function wireTouch() {
+    try {
+      const ok = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+      if (!ok) return;
+      const wrap = document.getElementById('world-wrap');
+      const world = document.getElementById('world');
+      if (!wrap || !world) return;
+      world.style.touchAction = 'none';
+
+      // visible joystick + a silent 360px "thumb" hit-zone centred on it
+      const dpad = document.createElement('div');
+      dpad.id = 'dpad';
+      dpad.style.cssText = 'position:absolute;bottom:18px;left:18px;width:120px;height:120px;border-radius:50%;background:rgba(5,8,12,.72);border:1px solid #1b2737;z-index:8;pointer-events:none';
+      const cv = document.createElement('div');
+      const ch = document.createElement('div');
+      cv.style.cssText = 'position:absolute;left:50%;top:50%;width:1.5px;height:14px;transform:translate(-50%,-50%);background:rgba(55,226,255,.5)';
+      ch.style.cssText = 'position:absolute;left:50%;top:50%;width:14px;height:1.5px;transform:translate(-50%,-50%);background:rgba(55,226,255,.5)';
+      dpad.appendChild(cv);
+      dpad.appendChild(ch);
+
+      const zone = document.createElement('div');
+      zone.id = 'dpad-zone';
+      zone.style.cssText = 'position:absolute;left:-102px;bottom:-102px;width:360px;height:360px;z-index:8;touch-action:none';
+      wrap.appendChild(dpad);
+      wrap.appendChild(zone);
+
+      const RAD = 180, DEAD = 14, TAP_DUR = 250;
+      const clamp = v => v < -1 ? -1 : v > 1 ? 1 : v;
+
+      function onStart(e) {
+        if (touchNav.id !== -1) return;
+        const t = e.touches[0];
+        touchNav.id = t.identifier;
+        touchNav.sx = t.clientX;
+        touchNav.sy = t.clientY;
+        touchNav.st = performance.now();
+        touchNav.moved = false;
+        e.preventDefault();
+      }
+
+      function onMove(e) {
+        if (touchNav.id === -1) return;
+        let t = null;
+        for (let i = 0; i < e.touches.length; i++) {
+          if (e.touches[i].identifier === touchNav.id) { t = e.touches[i]; break; }
+        }
+        if (!t) return;
+        const dx = t.clientX - touchNav.sx, dy = t.clientY - touchNav.sy;
+        const dist = Math.hypot(dx, dy);
+        if (dist > DEAD) {
+          touchNav.moved = true;
+          const mag = Math.min(dist, RAD) / RAD;
+          touchNav.turn = clamp((dx / dist) * mag);
+          touchNav.fwd = clamp((-dy / dist) * mag);
+        }
+        e.preventDefault();
+      }
+
+      function onEnd(e) {
+        if (touchNav.id === -1) return;
+        let ended = !e.changedTouches || e.changedTouches.length === 0;
+        for (let i = 0; i < e.changedTouches.length; i++) {
+          if (e.changedTouches[i].identifier === touchNav.id) ended = true;
+        }
+        if (!ended) return;
+        const tap = !touchNav.moved && (performance.now() - touchNav.st) < TAP_DUR;
+        touchNav.id = -1;
+        touchNav.turn = 0;
+        touchNav.fwd = 0;
+        // a tap = a short "W": press the walk-forward key briefly
+        if (tap) { keys['w'] = true; setTimeout(() => { keys['w'] = false; }, 220); }
+      }
+
+      const opts = { passive: false };
+      world.addEventListener('touchstart', onStart, opts);
+      world.addEventListener('touchmove', onMove, opts);
+      world.addEventListener('touchend', onEnd);
+      world.addEventListener('touchcancel', onEnd);
+      zone.addEventListener('touchstart', onStart, opts);
+      zone.addEventListener('touchmove', onMove, opts);
+      zone.addEventListener('touchend', onEnd);
+      zone.addEventListener('touchcancel', onEnd);
+    } catch (err) {
+      console.warn('[SEN] touch input unavailable', err);
+    }
+  }
+
   /* ---------- fire ---------- */
   function triggerFire(on) {
     fireActive = on;
@@ -485,13 +576,18 @@ SEN.Main = (() => {
   function stepUser(u, dt) {
     const sp = 190;
     // Q / E and left/right arrows turn; W/S + up/down move along heading
-    if (keys['q'] || keys['arrowleft']) u.heading -= 2.6 * dt;
-    if (keys['e'] || keys['arrowright']) u.heading += 2.6 * dt;
+    // joystick contributes a proportional -1..1 vector on the same axes
+    let turn = 0;
+    if (keys['q'] || keys['arrowleft']) turn -= 1;
+    if (keys['e'] || keys['arrowright']) turn += 1;
+    turn += touchNav.turn;
 
     let fwd = 0;
     if (keys['w'] || keys['arrowup']) fwd += 1;
     if (keys['s'] || keys['arrowdown']) fwd -= 1;
+    fwd += touchNav.fwd;
 
+    u.heading += 2.6 * turn * dt;
     u.x += Math.cos(u.heading) * fwd * sp * dt;
     u.y += Math.sin(u.heading) * fwd * sp * dt;
     u.x = Math.max(30, Math.min(SEN.WORLD.w - 30, u.x));
