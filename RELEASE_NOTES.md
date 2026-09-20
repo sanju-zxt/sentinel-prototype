@@ -1,8 +1,13 @@
-# Sentinel v0.1.0 - Release Notes
+# Sentinel - Release Notes
 
-**First release of Sentinel, the haptic co-pilot for people who can't see.**
+**Sentinel is the haptic co-pilot for people who can't see.** This is the single consolidated release notes covering all versions.
 
 Live: **<https://sanju-zxt.github.io/sentinel-prototype/>** - an installable PWA that runs fully offline. Everything runs on-device, silence-first, in the browser or on your phone. No cloud, no upload, no data leaves the device.
+
+## Version history
+
+- **v0.1.1** (Sep 2026) - Voice input, guided turn-by-turn navigation, AUTO TOUR, performance optimizations (hot loops, PiP heatmap, detector postprocess), offline navigation fallback, 13-slide hackathon deck + pptx build tooling.
+- **v0.1.0** (Sep 2026) - First prototype: the 4 pillars, silence-first perception engine, on-device YOLOv8-nano + MiDaS depth estimation, kinesthesia, visual-SLAM-lite, haptic belt, Capacitor/PWA shell.
 
 ## The 4 Pillars
 
@@ -15,18 +20,17 @@ Live: **<https://sanju-zxt.github.io/sentinel-prototype/>** - an installable PWA
 
 Sentinel inverts the assistive-tech model. The **Perception Engine** is a salience filter - it scores every potential alert by how imminent, actionable, and non-redundant it is, then surfaces only the single most important thing, and only when it matters. Everything else is logged in the **Silence Log** - visible proof that Sentinel is watching, choosing, and deliberately staying quiet. It stays silent, and only speaks when it matters.
 
-## New in this round (v0.1)
+## Everything that ships (all versions combined)
 
 - 🎙️ **Voice input** (`voice.js`) - the **🎙️ VOICE** button opens a one-shot listen and routes recognized words straight to Sentinel: say *"5"*, *"where are my keys"*, or *"guide me"*. Web Speech API, feature-detected, entirely on-device.
 - 🧭 **Guided turn-by-turn nav** (`guide.js`) - press **N** and Sentinel picks the nearest reachable landmark, speaks a friendly name for that leg, and every ~2.6s gives a spoken side + distance nudge ("Turn right - the cafe, 32 meters"), pulsing the haptic belt in the correct direction. Announces arrival within 70px.
 - 🚶 **AUTO TOUR** - press **0** and Sentinel walks ITSELF through the real plaza - crosswalk → nearest EXIT → the keys POI → the cafe → loop-close re-anchor. Each stop is one precise spoken line that earns the voice; the rest of the walk stays calm and silent. It ends itself at the last stop.
-
-Plus the in-browser real-camera **YOLOv8-nano + MiDaS deepmixture** pipeline (on-device, WASM), **kinesthesia**, **visual-SLAM-lite** localization with loop closure, the haptic **belt**, and the **Capacitor/PWA** shell.
+- In-browser real-camera **YOLOv8-nano + MiDaS deepmixture** pipeline (on-device, WASM), **kinesthesia**, **visual-SLAM-lite** localization with loop closure, the haptic **belt**, and the **Capacitor/PWA** shell.
 
 ## Run it + all hotkeys
 
 ```bash
-git clone https://github.com/SEANSAJU/sentinel-prototype.git
+git clone https://github.com/sanju-zxt/sentinel-prototype.git
 cd sentinel-prototype
 npx serve .
 # or just open index.html directly in your browser
@@ -60,7 +64,7 @@ Silence-first, graceful by design.
 
 ## Assets
 
-This release's GitHub assets include:
+GitHub assets include:
 
 - **`shot1.png`** - app screenshot (also in the README)
 - **Three demo recordings** in **`tools/demo-rec/out/`** - three `.webm` screen recordings of the live app (the AUTO TOUR and the guided workflows)
@@ -79,6 +83,6 @@ All 23 checks across the three suites are green.
 
 ---
 
-**Built by Sanju** - prototype v0.1
+**Built by Sanju** - prototype
 
 > "The best accessibility feature is one you never notice working."
